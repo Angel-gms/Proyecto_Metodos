@@ -2,3 +2,7 @@ streamlit
 yfinance
 pandas
 numpy
+scipy.stats
+matplotlib.pyplot
+PIL
+Image

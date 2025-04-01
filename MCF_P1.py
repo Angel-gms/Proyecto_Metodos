@@ -14,8 +14,8 @@ from PIL import Image
 st.title("Proyecto parte 1 - Análisis de un Activo Financiero")
 st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laura Berenice")
 
-#imagen = Image.open()
-#st.image(imagen)
+imagen = Image.open(https://github.com/Angel-gms/Proyecto_Metodos/blob/aa00bc18268bdf487c9c9f687b724a27683fd8c4/MCF_imagen.jpeg)
+st.image(imagen)
 #######################################################
 # (a)~> Descargamos los datos de nuestro activo
 #######################################################

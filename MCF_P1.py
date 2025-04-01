@@ -1,105 +1,230 @@
-import yfinance as yf
-import pandas as pd
+#######################################################
+# Importamos las librerias que utilizamos 
+#######################################################
+
+import yfinance as yf 
+import pandas as pd 
 import numpy as np
+import scipy.stats as stats
 from scipy.stats import skew, kurtosis, norm, t
 import streamlit as st
+import matplotlib.pyplot as plt
+from PIL import Image 
 
-# ================================
-# Inciso (a): Descarga y descripción del activo
-# ================================
-st.title("Proyecto MCF - Análisis de Activo Financiero")
+st.title("Proyecto parte 1 - Análisis de un Activo Financiero")
+st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laura Berenice")
 
-# Selecciona el activo: En este ejemplo usamos AAPL (Apple Inc.)
-asset = "AAPL"
+#imagen = Image.open()
+#st.image(imagen)
+#######################################################
+# (a)~> Descargamos los datos de nuestro activo
+#######################################################
+
+# Seleccionamos para el proyecto BBVA
 st.subheader("Descripción del Activo")
 st.write(
-    "El activo seleccionado es Apple Inc. (AAPL), una empresa líder en tecnología y electrónica de consumo. "
-    "Se ha descargado la información financiera desde el año 2010 usando Yahoo Finance."
+    "Banco Bilbao Vizcaya Argentaria, S.A. presta servicios de banca minorista, "
+    "banca mayorista y gestión de activos principalmente en España, México, Turquía, Sudamérica, "
+    "resto de Europa, Estados Unidos y Asia. La empresa ofrece cuentas de ahorro, depósitos a la vista"
+    " y depósitos a plazo; y préstamos hipotecarios para viviendas, otros hogares, tarjetas de crédito y empresas "
+    "y el sector público, así como financiación al consumo. Ofrece negocios de seguros y gestión de activos, "
+    "incluidos corporativos, comerciales, PYMES, sistemas de pago, banca minorista, privada y de inversión,"
+    " seguros de pensiones y vida, arrendamiento, factoraje y corretaje. La empresa ofrece sus productos "
+    "a través de canales en línea y móviles. Banco Bilbao Vizcaya Argentaria, S.A. fue fundado en 1857 "
+    "y tiene su sede en Bilbao, España."
 )
+# Tomamos los datos desde 2010
+datos = yf.download("BBVA", start="2010-01-01")['Close']
+ultima_fecha = str(datos.index[-1])
+st.write(f"Muestra los datos descargados del precio de cierre hasta {ultima_fecha[:10]}:")
+st.dataframe(datos)
 
-# Descarga de datos desde 2010
-data = yf.download(asset, start="2010-01-01")['Adj Close']
-data = data.dropna()
-st.write("Muestra de datos descargados:")
-st.dataframe(data.tail())
+#######################################################
+# (b)~> Calculo de rendimientos diarios
+#######################################################
 
-# ================================
-# Inciso (b): Cálculo de rendimientos diarios y estadísticas
-# ================================
-returns = data.pct_change().dropna()  # cálculo de retornos diarios
-mean_ret = returns.mean()
-skew_ret = skew(returns)
-excess_kurt = kurtosis(returns)  # Por defecto, devuelve la curtosis de Fisher (exceso de curtosis)
+rendimientos = datos.pct_change().dropna()
+rendimiento_md = rendimientos.mean()
+sesgo = skew(rendimientos)
+kurtosiss = kurtosis(rendimientos) 
 
 st.subheader("Estadísticas de Rendimientos Diarios")
-st.write(f"**Media:** {mean_ret:.6f}")
-st.write(f"**Sesgo:** {skew_ret:.6f}")
-st.write(f"**Exceso de Curtosis:** {excess_kurt:.6f}")
 
-# ================================
-# Inciso (c): Cálculo de VaR y Expected Shortfall (ES)
-# Se realizan cuatro aproximaciones:
-#   1. Paramétrico normal.
-#   2. Paramétrico t-Student.
-#   3. Histórico.
-#   4. Monte Carlo (suponiendo distribución normal).
-# ================================
-alpha_levels = [0.95, 0.975, 0.99]
-results = {"Método": [], "α": [], "VaR": [], "ES": []}
+col1, col2, col3= st.columns(3)
+col1.metric("Rendimiento Medio Diario", f"{rendimiento_md.iloc[0]:.6%}")
+col2.metric("Sesgo", f"{sesgo.item():.6f}")
+col3.metric("Kurtosis", f"{kurtosiss.item():.6f}")
 
-# 1. Método Paramétrico con Distribución Normal
-mu = returns.mean()
-sigma = returns.std()
-for alpha in alpha_levels:
-    # Se utiliza el cuantil de la cola inferior (1 - α)
-    z = norm.ppf(1 - alpha)
-    # Se define VaR como la pérdida que excede con probabilidad (1-α)
-    var_normal = -(mu + sigma * z)
-    # Fórmula para el Expected Shortfall (ES) bajo normal:
-    es_normal = -(mu - sigma * norm.pdf(z) / (1 - alpha))
-    results["Método"].append("Paramétrico Normal")
-    results["α"].append(alpha)
-    results["VaR"].append(var_normal)
-    results["ES"].append(es_normal)
+# Histograma de rendimientos
+plt.style.use('dark_background')
+st.subheader("Histograma de Rendimientos")
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.hist(rendimientos, bins=30, alpha=0.7, color='blue', edgecolor='black')
+ax.axvline(rendimiento_md.iloc[0], color='red', linestyle='dashed', linewidth=2, label=f"Promedio: {rendimiento_md.iloc[0]:.6%}")
+ax.legend()
+ax.set_xlabel("Rendimiento Diario")
+ax.set_ylabel("Frecuencia")
+st.pyplot(fig)
 
-# 2. Método Paramétrico con Distribución t-Student
-# Se ajustan los parámetros de la t-Student a los datos de retornos
-df, loc, scale = t.fit(returns)
-for alpha in alpha_levels:
-    t_quantile = t.ppf(1 - alpha, df, loc=loc, scale=scale)
-    var_t = -t_quantile
-    # Para el ES bajo t-Student se realiza una aproximación por simulación:
-    sim = t.rvs(df, loc=loc, scale=scale, size=100000)
-    threshold = np.percentile(sim, (1 - alpha) * 100)
-    es_t = -sim[sim <= threshold].mean()
-    results["Método"].append("Paramétrico t-Student")
-    results["α"].append(alpha)
-    results["VaR"].append(var_t)
-    results["ES"].append(es_t)
+#######################################################
+# (c)~> Calculo de VaR y Expected Shortfall (ES)
+#######################################################
 
-# 3. Método Histórico
-for alpha in alpha_levels:
-    var_hist = -np.percentile(returns, (1 - alpha) * 100)
-    threshold_hist = np.percentile(returns, (1 - alpha) * 100)
-    es_hist = -returns[returns <= threshold_hist].mean()
-    results["Método"].append("Histórico")
-    results["α"].append(alpha)
-    results["VaR"].append(var_hist)
-    results["ES"].append(es_hist)
+st.subheader("Metricas de riesgo VaR y ES")
+# Seleccion de alpha
+alphas = [0.95, 0.975, 0.99]
+seleccionador = st.selectbox("Selecciona una alpha (α)", alphas)
 
-# 4. Método Monte Carlo (suponiendo distribución normal)
-np.random.seed(42)  # para reproducibilidad
-simulations = 100000
-simulated_returns = np.random.normal(mu, sigma, simulations)
-for alpha in alpha_levels:
-    var_mc = -np.percentile(simulated_returns, (1 - alpha) * 100)
-    threshold_mc = np.percentile(simulated_returns, (1 - alpha) * 100)
-    es_mc = -simulated_returns[simulated_returns <= threshold_mc].mean()
-    results["Método"].append("Monte Carlo")
-    results["α"].append(alpha)
-    results["VaR"].append(var_mc)
-    results["ES"].append(es_mc)
+if seleccionador:
+    st.write(f"Metricas para un alpha(α) = {seleccionador}")
+    media = np.mean(rendimientos)
+    des_est = np.std(rendimientos)
 
-results_df = pd.DataFrame(results)
-st.subheader("Resultados de VaR y Expected Shortfall (ES)")
+    # VaR Parametrico normal
+    var_norm = norm.ppf(1-seleccionador,media,des_est)
+    # VaR Parametrico t-student
+    grad_lib = len(rendimientos) - 1
+    var_t = t.ppf(1-seleccionador, grad_lib, media, des_est)
+    # VaR historico
+    var_h = (rendimientos.quantile(1-seleccionador))
+    # VaR Monte Carlo
+    n_sim = 100000
+    rendimientos_sim = np.random.normal(media, des_est, n_sim)
+    var_mc = np.percentile(rendimientos_sim, 100-seleccionador*100)
+    # CVaR o ES 
+    cvar = rendimientos[rendimientos<=var_h].mean()
+
+    col4, col5, col6, col7, col8= st.columns(5)
+    col4.metric(f"VaR parametrico normal", f"{var_norm.item():.3%}")
+    col5.metric("VaR parametrico t-student", f"{var_t.item():.3%}")
+    col6.metric("VaR Historico", f"{var_h.item():.3%}")
+    col7.metric("VaR Monte Carlo", f"{var_mc.item():.3%}")
+    col8.metric("CVaR", f"{cvar.item():.3%}")
+
+    #######################################################
+    # (d)~> Rolling windows
+    #######################################################
+    rolling = rendimientos.rolling(window=252)
+    rolling_media = rolling.mean()
+    rolling_des_est = rolling.std()
+
+    rolling_var_h = rolling.quantile(1-seleccionador)
+    rolling_cvar_h = rolling.apply(lambda x: x[x <= x.quantile(1-seleccionador)].mean())
+    rolling_var_norm = norm.ppf(1-seleccionador, rolling_media, rolling_des_est)
+    rolling_cvar_norm = rolling.apply(lambda x: x[x <= norm.ppf(1 - seleccionador, x.mean(), x.std())].mean())
+
+
+    vaR_rolling_df = pd.DataFrame({'Date': rendimientos.index,
+                                   'Rolling VaR normal': rolling_var_norm.squeeze(),
+                                   'Rolling VaR historico':rolling_var_h.squeeze(),
+                                   'Rolling CVaR normal': rolling_cvar_norm.squeeze(),
+                                   'Rolling CVaR historico': rolling_cvar_h.squeeze()})
+    vaR_rolling_df.set_index('Date', inplace=True)
+
+    # Crear una gráfica que muestre la serie de retornos diarios (en %) y los estimados de VaR y ES
+    fig, ax = plt.subplots(figsize=(14,7))
+
+    # Graficar los retornos diarios (convertidos a porcentaje)
+    ax.plot(rendimientos.index, rendimientos * 100, color='lightblue', alpha=0.5, label="Retornos diarios")
+
+    plt.plot(vaR_rolling_df.index, (vaR_rolling_df['Rolling VaR normal']*100).round(5), label=f'Rolling VaR parametrico normal al {seleccionador}%', color='red')
+    plt.plot(vaR_rolling_df.index, (vaR_rolling_df['Rolling CVaR normal']*100).round(5), label=f'Rolling CVaR parametrico normal al {seleccionador}%', color='purple')
+    plt.plot(vaR_rolling_df.index, (vaR_rolling_df['Rolling VaR historico']*100).round(5), label=f'Rolling VaR historico al {seleccionador}%', color='blue')
+    plt.plot(vaR_rolling_df.index, (vaR_rolling_df['Rolling CVaR historico']*100).round(5), label=f'Rolling CVaR historico al {seleccionador}%', color='orange')
+
+    ax.set_title("Retornos diarios con VaR y ES con ventana móvil de 252 retornos")
+    ax.set_xlabel("Fecha")
+    ax.set_ylabel("Porcentaje (%)")
+    ax.legend(loc="upper left")
+    ax.grid(True)
+
+    st.pyplot(fig)
+
+
+#######################################################
+# (e)~> Violaciones 
+#######################################################
+
+rolling_var_h = rolling_var_h.dropna()
+rolling_cvar_h = rolling_cvar_h.dropna()
+
+# Desplazar las predicciones en 1 día para predecir el rendimiento del día siguiente
+var_pred = rolling_var_h.shift(1)
+cvar_pred = rolling_cvar_h.shift(1)
+
+# Restricción: Solo se pueden evaluar los días en los que existe una predicción (después de la ventana inicial)
+analysis_dates = var_pred.dropna().index
+
+# Evaluar violaciones: se considera violación si el rendimiento real es menor que la predicción
+violation_var = (rendimientos.loc[analysis_dates] < var_pred.loc[analysis_dates]).astype(int)
+violation_cvar = (rendimientos.loc[analysis_dates] < cvar_pred.loc[analysis_dates]).astype(int)
+
+num_total = len(analysis_dates)
+num_violations_var = violation_var.sum()
+num_violations_cvar = violation_cvar.sum()
+
+
+resultados_df = pd.DataFrame({
+    "Medida": [f"VaR {seleccionador}%", f"CVaR {seleccionador}%"],
+    "Número de violaciones": [num_violations_var.iloc[0], num_violations_cvar.iloc[0]],
+    "Porcentaje (%)": [
+        round(num_violations_var.iloc[0] / num_total * 100, 4),
+        round(num_violations_cvar.iloc[0] / num_total * 100, 4)
+    ]
+})
+
+st.subheader("Resultados de Violaciones")
+st.table(resultados_df)
+
+#######################################################
+# (f)~> forumula
+#######################################################
+
+# Cuantiles para los niveles de significancia:
+# norm.ppf(0.05) y norm.ppf(0.01) son negativos (por ejemplo, -1.64485 y -2.32635)
+q_05 = norm.ppf(0.05)  # Aproximadamente -1.64485
+q_01 = norm.ppf(0.01)  # Aproximadamente -2.32635
+
+# Estimación del VaR utilizando la volatilidad móvil (sin incorporar la media, solo la volatilidad)
+# Se define: VaR = -qₐ × σ₂₅₂
+rolling_VaR_95 = -q_05 * rolling_des_est
+rolling_VaR_99 = -q_01 * rolling_des_est
+
+# Eliminar valores NA y desplazar la predicción en 1 día para predecir el rendimiento del día siguiente
+rolling_VaR_95 = rolling_VaR_95.dropna().shift(1)
+rolling_VaR_99 = rolling_VaR_99.dropna().shift(1)
+
+# Evaluar las violaciones:
+# Se considera violación si el rendimiento real es menor que -VaR (pues VaR se calcula como un valor positivo que indica la magnitud de la pérdida)
+violations_VaR_95 = (rendimientos.loc[analysis_dates] < -rolling_VaR_95.loc[analysis_dates]).astype(int)
+violations_VaR_99 = (rendimientos.loc[analysis_dates] < -rolling_VaR_99.loc[analysis_dates]).astype(int)
+
+total_predictions = len(analysis_dates)
+num_violations_95 = violations_VaR_95.sum()
+num_violations_99 = violations_VaR_99.sum()
+
+# Crear un DataFrame con los resultados de violaciones
+results_df = pd.DataFrame({
+    "Medida": ["VaR 95%", "VaR 99%"],
+    "Número de Violaciones": [num_violations_95.iloc[0], num_violations_99.iloc[0]],
+    "Porcentaje de Violaciones (%)": [
+        round(num_violations_95.iloc[0] / total_predictions * 100, 4),
+        round(num_violations_99.iloc[0] / total_predictions * 100, 4)
+    ]
+})
+
+st.subheader("Evaluación de Violaciones")
 st.table(results_df)
+
+# Gráfica: Se muestran los rendimientos diarios (en porcentaje) y las estimaciones de VaR
+fig, ax = plt.subplots(figsize=(14,7))
+ax.plot(rendimientos.index, rendimientos * 100, color='gray', alpha=0.5, label="Retornos diarios (%)")
+ax.plot(rolling_VaR_95.index, rolling_VaR_95 * 100, label="VaR 95% (Volatilidad Móvil)", color='red')
+ax.plot(rolling_VaR_99.index, rolling_VaR_99 * 100, label="VaR 99% (Volatilidad Móvil)", color='blue')
+ax.set_title("Retornos diarios y VaR con Volatilidad Móvil (ventana de 252 días)")
+ax.set_xlabel("Fecha")
+ax.set_ylabel("Porcentaje (%)")
+ax.legend(loc="upper left")
+ax.grid(True)
+
+st.pyplot(fig)

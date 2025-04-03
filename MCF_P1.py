@@ -11,7 +11,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from PIL import Image 
 
-st.title(" " *20 + "Proyecto parte 1 - Análisis de un Activo Financiero")
+st.title(" " *20 + "Proyecto 1 - Value-At-Risk y Expected Shortfall.")
 
 st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laura Berenice")
 
@@ -22,7 +22,7 @@ st.image(imagen)
 #######################################################
 
 # Seleccionamos para el proyecto BBVA
-st.subheader("Descripción del Activo")
+st.subheader("Descripción del Activo (BBVA)")
 st.write(
     "Banco Bilbao Vizcaya Argentaria, S.A. presta servicios de banca minorista, "
     "banca mayorista y gestión de activos principalmente en España, México, Turquía, Sudamérica, "
@@ -145,25 +145,37 @@ if seleccionador:
 #######################################################
 # (e)~> Violaciones 
 #######################################################
-
+# Quitamos lon NA's
 rolling_var_h = rolling_var_h.dropna()
 rolling_cvar_h = rolling_cvar_h.dropna()
+
+q_95 = norm.ppf(0.05)  
+q_99 = norm.ppf(0.01)  
+
+# VaR = -qₐ × σ₂₅₂
+rolling_VaR_95 = q_95 * rolling_des_est
+rolling_VaR_99 = q_99 * rolling_des_est
 
 # Desplazar las predicciones en 1 día para predecir el rendimiento del día siguiente
 var_pred = rolling_var_h.shift(1)
 cvar_pred = rolling_cvar_h.shift(1)
+rolling_VaR_95_pred = rolling_VaR_95.dropna().shift(1)
+rolling_VaR_99_pred = rolling_VaR_99.dropna().shift(1)
 
 # Restricción: Solo se pueden evaluar los días en los que existe una predicción (después de la ventana inicial)
-analysis_dates = var_pred.dropna().index
+fechas = var_pred.dropna().index
 
 # Evaluar violaciones: se considera violación si el rendimiento real es menor que la predicción
-violation_var = (rendimientos.loc[analysis_dates] < var_pred.loc[analysis_dates]).astype(int)
-violation_cvar = (rendimientos.loc[analysis_dates] < cvar_pred.loc[analysis_dates]).astype(int)
+violation_var = (rendimientos.loc[fechas] < var_pred.loc[fechas]).astype(int)
+violation_cvar = (rendimientos.loc[fechas] < cvar_pred.loc[fechas]).astype(int)
+violations_VaR_95 = (rendimientos.loc[fechas] < rolling_VaR_95_pred.loc[fechas]).astype(int)
+violations_VaR_99 = (rendimientos.loc[fechas] < rolling_VaR_99_pred.loc[fechas]).astype(int)
 
-num_total = len(analysis_dates)
+num_total = len(fechas)
 num_violations_var = violation_var.sum()
 num_violations_cvar = violation_cvar.sum()
-
+num_violations_95 = violations_VaR_95.sum()
+num_violations_99 = violations_VaR_99.sum()
 
 resultados_df = pd.DataFrame({
     "Medida": [f"VaR {seleccionador}%", f"CVaR {seleccionador}%"],
@@ -174,54 +186,28 @@ resultados_df = pd.DataFrame({
     ]
 })
 
-st.subheader("Resultados de Violaciones")
+# Tabla con resultdo de violaciones
+st.subheader("Violaciones de VaR historico")
 st.table(resultados_df)
 
 #######################################################
 # (f)~> forumula
 #######################################################
-
-# Cuantiles para los niveles de significancia:
-# norm.ppf(0.05) y norm.ppf(0.01) son negativos (por ejemplo, -1.64485 y -2.32635)
-q_05 = norm.ppf(0.05)  # Aproximadamente -1.64485
-q_01 = norm.ppf(0.01)  # Aproximadamente -2.32635
-
-# Estimación del VaR utilizando la volatilidad móvil (sin incorporar la media, solo la volatilidad)
-# Se define: VaR = -qₐ × σ₂₅₂
-rolling_VaR_95 = -q_05 * rolling_des_est
-rolling_VaR_99 = -q_01 * rolling_des_est
-
-# Eliminar valores NA y desplazar la predicción en 1 día para predecir el rendimiento del día siguiente
-rolling_VaR_95 = rolling_VaR_95.dropna().shift(1)
-rolling_VaR_99 = rolling_VaR_99.dropna().shift(1)
-
-# Evaluar las violaciones:
-# Se considera violación si el rendimiento real es menor que -VaR (pues VaR se calcula como un valor positivo que indica la magnitud de la pérdida)
-violations_VaR_95 = (rendimientos.loc[analysis_dates] < -rolling_VaR_95.loc[analysis_dates]).astype(int)
-violations_VaR_99 = (rendimientos.loc[analysis_dates] < -rolling_VaR_99.loc[analysis_dates]).astype(int)
-
-total_predictions = len(analysis_dates)
-num_violations_95 = violations_VaR_95.sum()
-num_violations_99 = violations_VaR_99.sum()
-
-# Crear un DataFrame con los resultados de violaciones
+# Crear un DataFrame con las violaciones de rolling window
 results_df = pd.DataFrame({
     "Medida": ["VaR 95%", "VaR 99%"],
     "Número de Violaciones": [num_violations_95.iloc[0], num_violations_99.iloc[0]],
     "Porcentaje de Violaciones (%)": [
-        round(num_violations_95.iloc[0] / total_predictions * 100, 4),
-        round(num_violations_99.iloc[0] / total_predictions * 100, 4)
+        round(num_violations_95.iloc[0] / num_total * 100, 4),
+        round(num_violations_99.iloc[0] / num_total * 100, 4)
     ]
 })
-
-st.subheader("Evaluación de Violaciones")
-st.table(results_df)
 
 # Gráfica: Se muestran los rendimientos diarios (en porcentaje) y las estimaciones de VaR
 fig, ax = plt.subplots(figsize=(14,7))
 ax.plot(rendimientos.index, rendimientos * 100, color='gray', alpha=0.5, label="Retornos diarios (%)")
-ax.plot(rolling_VaR_95.index, rolling_VaR_95 * 100, label="VaR 95% (Volatilidad Móvil)", color='red')
-ax.plot(rolling_VaR_99.index, rolling_VaR_99 * 100, label="VaR 99% (Volatilidad Móvil)", color='blue')
+ax.plot(rolling_VaR_95_pred.index, rolling_VaR_95_pred * 100, label="VaR 95% (Volatilidad Móvil)", color='red')
+ax.plot(rolling_VaR_99_pred.index, rolling_VaR_99_pred * 100, label="VaR 99% (Volatilidad Móvil)", color='blue')
 ax.set_title("Retornos diarios y VaR con Volatilidad Móvil (ventana de 252 días)")
 ax.set_xlabel("Fecha")
 ax.set_ylabel("Porcentaje (%)")
@@ -229,3 +215,8 @@ ax.legend(loc="upper left")
 ax.grid(True)
 
 st.pyplot(fig)
+
+# Tabla con resultdo de violaciones
+st.subheader("Evaluación de Violaciones")
+st.table(results_df)
+

@@ -19,7 +19,7 @@ st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laur
 
 imagen = Image.open('MCF_imagen.jpeg')
 imagen2 = Image.open('MCF_imagen2.jpeg')
-imagen2 = Image.open('MCF_imagen3.jpeg')
+imagen3 = Image.open('MCF_imagen3.jpeg')
 st.image(imagen)
 #######################################################
 # (a)~> Descargamos los datos de nuestro activo

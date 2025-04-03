@@ -11,7 +11,8 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from PIL import Image 
 
-st.title("Proyecto parte 1 - Análisis de un Activo Financiero")
+st.title(" " *20 + "Proyecto parte 1 - Análisis de un Activo Financiero")
+
 st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laura Berenice")
 
 imagen = Image.open('MCF_imagen.jpeg')

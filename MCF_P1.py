@@ -206,9 +206,9 @@ results_df = pd.DataFrame({
 # Gráfica: Se muestran los rendimientos diarios (en porcentaje) y las estimaciones de VaR
 fig, ax = plt.subplots(figsize=(14,7))
 ax.plot(rendimientos.index, rendimientos * 100, color='gray', alpha=0.5, label="Retornos diarios (%)")
-ax.plot(rolling_VaR_95_pred.index, rolling_VaR_95_pred * 100, label="VaR 95% (Volatilidad Móvil)", color='red')
-ax.plot(rolling_VaR_99_pred.index, rolling_VaR_99_pred * 100, label="VaR 99% (Volatilidad Móvil)", color='blue')
-ax.set_title("Retornos diarios y VaR con Volatilidad Móvil (ventana de 252 días)")
+ax.plot(rolling_VaR_95_pred.index, rolling_VaR_95_pred * 100, label="VaR 95%", color='red')
+ax.plot(rolling_VaR_99_pred.index, rolling_VaR_99_pred * 100, label="VaR 99%", color='blue')
+ax.set_title("Retornos diarios y VaR con Rolling Window (ventana de 252 días)")
 ax.set_xlabel("Fecha")
 ax.set_ylabel("Porcentaje (%)")
 ax.legend(loc="upper left")
@@ -217,6 +217,6 @@ ax.grid(True)
 st.pyplot(fig)
 
 # Tabla con resultdo de violaciones
-st.subheader("Evaluación de Violaciones")
+st.subheader("Violaciones VaR Rolling Window")
 st.table(results_df)
 

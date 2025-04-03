@@ -19,6 +19,7 @@ st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laur
 
 imagen = Image.open('MCF_imagen.jpeg')
 imagen2 = Image.open('MCF_imagen2.jpeg')
+imagen2 = Image.open('MCF_imagen3.jpeg')
 st.image(imagen)
 #######################################################
 # (a)~> Descargamos los datos de nuestro activo
@@ -224,4 +225,5 @@ st.subheader("Violaciones VaR Rolling Window")
 st.table(results_df)
 
 st.image(imagen2)
+st.image(imagen3)
 

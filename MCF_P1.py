@@ -18,6 +18,7 @@ st.title(" " *20 + "Proyecto 1 - Value-At-Risk y Expected Shortfall.")
 st.write("Nombres: * Martínez Suárez Ángel Gabriel ---- * Badillo Santos Laura Berenice")
 
 imagen = Image.open('MCF_imagen.jpeg')
+imagen2 = Image.open('MCF_imagen2.jpeg')
 st.image(imagen)
 #######################################################
 # (a)~> Descargamos los datos de nuestro activo
@@ -221,4 +222,6 @@ st.pyplot(fig)
 # Tabla con resultdo de violaciones
 st.subheader("Violaciones VaR Rolling Window")
 st.table(results_df)
+
+st.image(imagen2)
 

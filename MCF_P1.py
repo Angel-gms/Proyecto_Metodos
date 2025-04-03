@@ -1,3 +1,5 @@
+# Badillo Santos Laura Berenice
+# Martinez Suárez Ángel Gabriel
 #######################################################
 # Importamos las librerias que utilizamos 
 #######################################################
